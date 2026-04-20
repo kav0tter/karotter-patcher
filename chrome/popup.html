@@ -321,6 +321,9 @@
       letter-spacing: 0.08em;
       border-top: 1px solid var(--border);
     }
+    footer .credit { margin-top: 2px; }
+    footer .credit a { color: var(--phosphor); text-decoration: none; }
+    footer .credit a:hover { text-decoration: underline; }
 
     /* Disabled state */
     body.disabled .section .toggle-label,
@@ -434,7 +437,10 @@
     </div>
   </main>
 
-  <footer>KAROTTER://PATCHER — USE AT YOUR OWN RISK</footer>
+  <footer>
+    <div>KAROTTER://PATCHER — USE AT YOUR OWN RISK</div>
+    <div class="credit">developed by <a href="https://karotter.com/profile/v0" target="_blank">@v0</a></div>
+  </footer>
 
   <script src="popup.js"></script>
 </body>
