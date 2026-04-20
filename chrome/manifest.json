@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Karotter Patcher",
+  "version": "1.0.0",
+  "description": "karotter.com のクライアント側状態を書き換える拡張機能",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://karotter.com/*",
+    "https://karotter.jp/*",
+    "https://karotter.karon.jp/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://karotter.com/*",
+        "https://www.karotter.com/*",
+        "https://karotter.jp/*",
+        "https://www.karotter.jp/*",
+        "https://karotter.karon.jp/*",
+        "https://www.karotter.karon.jp/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://karotter.com/*",
+        "https://www.karotter.com/*",
+        "https://karotter.jp/*",
+        "https://www.karotter.jp/*",
+        "https://karotter.karon.jp/*",
+        "https://www.karotter.karon.jp/*"
+      ],
+      "js": ["patch.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

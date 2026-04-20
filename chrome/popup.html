@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>karotter://patcher</title>
+  <style>
+    :root {
+      --void:         #05080a;
+      --surface:      #0a0f0a;
+      --surface-raised: #0d140d;
+      --border:       #1a2a1a;
+      --border-glow:  #00ff4122;
+      --phosphor:     #00ff41;
+      --phosphor-dim: #00cc3380;
+      --phosphor-bg:  #00ff4108;
+      --cyan:         #00e5ff;
+      --cyan-dim:     #00e5ff60;
+      --amber:        #ffb000;
+      --amber-dim:    #ffb00040;
+      --red:          #ff3333;
+      --text:         #b0d0b0;
+      --text-dim:     #4a6a4a;
+      --mono:         'Consolas', 'Courier New', 'Monaco', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text);
+      background: var(--void);
+      width: 280px;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Scanline overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 65, 0.015) 2px,
+        rgba(0, 255, 65, 0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* CRT vignette */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%);
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(180deg, #0d140d 0%, var(--void) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--phosphor), transparent);
+      animation: scanbar 3s ease-in-out infinite;
+    }
+
+    @keyframes scanbar {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.8; }
+    }
+
+    .header-prompt {
+      font-size: 9px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+      letter-spacing: 0.05em;
+    }
+    .header-prompt span { color: var(--cyan-dim); }
+
+    .header-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--phosphor);
+      text-shadow: 0 0 8px var(--phosphor-dim), 0 0 20px rgba(0,255,65,0.15);
+      letter-spacing: 0.08em;
+    }
+
+    .header-sub {
+      font-size: 9px;
+      color: var(--text-dim);
+      margin-top: 2px;
+      letter-spacing: 0.03em;
+    }
+    .header-sub .ver { color: var(--cyan-dim); }
+
+    /* Status bar */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 9px;
+      color: var(--text-dim);
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--phosphor);
+      box-shadow: 0 0 4px var(--phosphor-dim);
+      animation: blink-dot 2s ease-in-out infinite;
+    }
+    .status-dot.off {
+      background: var(--red);
+      box-shadow: 0 0 4px rgba(255,51,51,0.4);
+      animation: none;
+    }
+
+    @keyframes blink-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .status-text { letter-spacing: 0.04em; }
+    .status-text .highlight { color: var(--phosphor); }
+
+    /* Main */
+    main { padding: 8px 0; }
+
+    /* Section */
+    .section { border-bottom: 1px solid var(--border); }
+    .section:last-child { border-bottom: none; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 9px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .section-header::before {
+      content: '//';
+      color: var(--phosphor-dim);
+      font-weight: 700;
+    }
+
+    /* Toggle row */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 12px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.1s;
+    }
+    .toggle-row:hover { background: var(--phosphor-bg); }
+
+    .toggle-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle-flag {
+      font-size: 10px;
+      color: var(--phosphor);
+      font-weight: 600;
+      min-width: 18px;
+      opacity: 0.7;
+    }
+
+    .toggle-label {
+      font-size: 11px;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    .toggle-input { display: none; }
+
+    .toggle-switch {
+      position: relative;
+      width: 32px; height: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle-switch::before {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 10px; height: 10px;
+      background: var(--text-dim);
+      border-radius: 1px;
+      transition: all 0.2s;
+    }
+    .toggle-input:checked + .toggle-switch {
+      background: var(--phosphor-bg);
+      border-color: var(--phosphor-dim);
+      box-shadow: 0 0 6px rgba(0,255,65,0.1);
+    }
+    .toggle-input:checked + .toggle-switch::before {
+      transform: translateX(16px);
+      background: var(--phosphor);
+      box-shadow: 0 0 4px var(--phosphor-dim);
+    }
+
+    /* Badge chips */
+    .badge-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 4px 12px 8px;
+    }
+    .badge-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s;
+    }
+    .badge-chip:hover { border-color: var(--phosphor-dim); }
+    .badge-chip input { display: none; }
+    .badge-chip .badge-icon {
+      position: relative;
+      width: 14px; height: 14px;
+      flex-shrink: 0;
+      opacity: 0.3;
+      transition: opacity 0.15s;
+    }
+    .badge-chip .badge-icon .bg-svg { position: absolute; inset: 0; width: 100%; height: 100%; fill: currentColor; }
+    .badge-chip .badge-icon .check-svg { position: absolute; inset: 0; width: 62%; height: 62%; margin: auto; }
+    .badge-chip input:checked ~ .badge-icon { opacity: 1; }
+    .badge-chip input:checked ~ .chip-label { color: var(--phosphor); }
+    .badge-chip[data-color="YELLOW"] .badge-icon { color: #f8c500; }
+    .badge-chip[data-color="PURPLE"] .badge-icon { color: #8b5cf6; }
+    .badge-chip[data-color="BLUE"]   .badge-icon { color: #1d9bf0; }
+    .badge-chip[data-color="GRAY"]   .badge-icon { color: #9ca3af; }
+    .badge-chip[data-color="BLACK"]  .badge-icon { color: #111827; }
+    .badge-chip[data-color="RED"]    .badge-icon { color: #ef4444; }
+    .badge-chip[data-color="GREEN"]  .badge-icon { color: #22c55e; }
+    .badge-chip[data-color="ORANGE"] .badge-icon { color: #ff7a00; }
+
+    /* Master toggle */
+    .master-row {
+      padding: 8px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .master-row .toggle-row { padding: 0; }
+    .master-row .toggle-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--phosphor);
+      text-shadow: 0 0 6px var(--phosphor-dim);
+    }
+    .master-row .toggle-switch { width: 36px; height: 18px; }
+    .master-row .toggle-switch::before { width: 12px; height: 12px; }
+    .master-row .toggle-input:checked + .toggle-switch::before {
+      transform: translateX(18px);
+    }
+
+    /* Console log */
+    .console {
+      padding: 6px 12px;
+      font-size: 9px;
+      color: var(--text-dim);
+      max-height: 60px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .console-line {
+      display: flex;
+      gap: 4px;
+      line-height: 1.6;
+    }
+    .console-ts { color: var(--text-dim); opacity: 0.5; }
+    .console-ok { color: var(--phosphor); }
+    .console-warn { color: var(--amber); }
+    .console-err { color: var(--red); }
+
+    /* Footer */
+    footer {
+      padding: 6px 12px;
+      font-size: 8px;
+      color: var(--text-dim);
+      opacity: 0.4;
+      text-align: center;
+      letter-spacing: 0.08em;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Disabled state */
+    body.disabled .section .toggle-label,
+    body.disabled .section .select-row .select-flag,
+    body.disabled .section .toggle-flag {
+      opacity: 0.3;
+    }
+    body.disabled .section .toggle-row,
+    body.disabled .section .select-row {
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-prompt"><span>$</span> karotter-patcher init</div>
+    <div class="header-title">KAROTTER PATCHER</div>
+    <div class="header-sub">client-side state injector <span class="ver">v1.0.0</span></div>
+  </header>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">
+      <span class="highlight">ACTIVE</span> — intercepting /api/auth/me
+    </span>
+  </div>
+
+  <div class="master-row">
+    <label class="toggle-row">
+      <div class="toggle-left">
+        <span class="toggle-flag">&gt;_</span>
+        <span class="toggle-label">PATCH ENGINE</span>
+      </div>
+      <input class="toggle-input" type="checkbox" id="enabled" />
+      <span class="toggle-switch"></span>
+    </label>
+  </div>
+
+  <main>
+    <div class="section">
+      <div class="section-header">fetch intercept</div>
+
+      <label class="toggle-row">
+        <div class="toggle-left">
+          <span class="toggle-flag">--admin</span>
+          <span class="toggle-label">isAdmin: true</span>
+        </div>
+        <input class="toggle-input" type="checkbox" id="isAdmin" />
+        <span class="toggle-switch"></span>
+      </label>
+
+      <div class="section-header">officialMark</div>
+      <div class="badge-chips" id="badgeChips">
+        <label class="badge-chip" data-color="YELLOW">
+          <input type="checkbox" value="YELLOW" class="badge-check" />
+          <span class="badge-icon"><svg class="bg-svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.918-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.337 2.25c-.416-.165-.866-.25-1.336-.25-2.21 0-3.918 1.79-3.918 4 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.46.826 2.75 2.043 3.45-.05.223-.08.455-.08.69 0 2.21 1.71 4 3.918 4 .47 0 .92-.086 1.336-.25.52 1.334 1.826 2.25 3.337 2.25 1.51 0 2.818-.916 3.337-2.25.415.163.865.248 1.336.248 2.21 0 3.918-1.79 3.918-4 0-.235-.03-.467-.08-.69 1.215-.7 2.043-1.99 2.043-3.45z"/></svg><svg class="check-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="chip-label">YELLOW</span>
+        </label>
+        <label class="badge-chip" data-color="PURPLE">
+          <input type="checkbox" value="PURPLE" class="badge-check" />
+          <span class="badge-icon"><svg class="bg-svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.918-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.337 2.25c-.416-.165-.866-.25-1.336-.25-2.21 0-3.918 1.79-3.918 4 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.46.826 2.75 2.043 3.45-.05.223-.08.455-.08.69 0 2.21 1.71 4 3.918 4 .47 0 .92-.086 1.336-.25.52 1.334 1.826 2.25 3.337 2.25 1.51 0 2.818-.916 3.337-2.25.415.163.865.248 1.336.248 2.21 0 3.918-1.79 3.918-4 0-.235-.03-.467-.08-.69 1.215-.7 2.043-1.99 2.043-3.45z"/></svg><svg class="check-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="chip-label">PURPLE</span>
+        </label>
+        <label class="badge-chip" data-color="BLUE">
+          <input type="checkbox" value="BLUE" class="badge-check" />
+          <span class="badge-icon"><svg class="bg-svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.918-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.337 2.25c-.416-.165-.866-.25-1.336-.25-2.21 0-3.918 1.79-3.918 4 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.46.826 2.75 2.043 3.45-.05.223-.08.455-.08.69 0 2.21 1.71 4 3.918 4 .47 0 .92-.086 1.336-.25.52 1.334 1.826 2.25 3.337 2.25 1.51 0 2.818-.916 3.337-2.25.415.163.865.248 1.336.248 2.21 0 3.918-1.79 3.918-4 0-.235-.03-.467-.08-.69 1.215-.7 2.043-1.99 2.043-3.45z"/></svg><svg class="check-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="chip-label">BLUE</span>
+        </label>
+        <label class="badge-chip" data-color="GRAY">
+          <input type="checkbox" value="GRAY" class="badge-check" />
+          <span class="badge-icon"><svg class="bg-svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.918-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.337 2.25c-.416-.165-.866-.25-1.336-.25-2.21 0-3.918 1.79-3.918 4 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.46.826 2.75 2.043 3.45-.05.223-.08.455-.08.69 0 2.21 1.71 4 3.918 4 .47 0 .92-.086 1.336-.25.52 1.334 1.826 2.25 3.337 2.25 1.51 0 2.818-.916 3.337-2.25.415.163.865.248 1.336.248 2.21 0 3.918-1.79 3.918-4 0-.235-.03-.467-.08-.69 1.215-.7 2.043-1.99 2.043-3.45z"/></svg><svg class="check-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="chip-label">GRAY</span>
+        </label>
+        <label class="badge-chip" data-color="BLACK">
+          <input type="checkbox" value="BLACK" class="badge-check" />
+          <span class="badge-icon"><svg class="bg-svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.918-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.337 2.25c-.416-.165-.866-.25-1.336-.25-2.21 0-3.918 1.79-3.918 4 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.46.826 2.75 2.043 3.45-.05.223-.08.455-.08.69 0 2.21 1.71 4 3.918 4 .47 0 .92-.086 1.336-.25.52 1.334 1.826 2.25 3.337 2.25 1.51 0 2.818-.916 3.337-2.25.415.163.865.248 1.336.248 2.21 0 3.918-1.79 3.918-4 0-.235-.03-.467-.08-.69 1.215-.7 2.043-1.99 2.043-3.45z"/></svg><svg class="check-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="chip-label">BLACK</span>
+        </label>
+        <label class="badge-chip" data-color="RED">
+          <input type="checkbox" value="RED" class="badge-check" />
+          <span class="badge-icon"><svg class="bg-svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.918-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.337 2.25c-.416-.165-.866-.25-1.336-.25-2.21 0-3.918 1.79-3.918 4 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.46.826 2.75 2.043 3.45-.05.223-.08.455-.08.69 0 2.21 1.71 4 3.918 4 .47 0 .92-.086 1.336-.25.52 1.334 1.826 2.25 3.337 2.25 1.51 0 2.818-.916 3.337-2.25.415.163.865.248 1.336.248 2.21 0 3.918-1.79 3.918-4 0-.235-.03-.467-.08-.69 1.215-.7 2.043-1.99 2.043-3.45z"/></svg><svg class="check-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="chip-label">RED</span>
+        </label>
+        <label class="badge-chip" data-color="GREEN">
+          <input type="checkbox" value="GREEN" class="badge-check" />
+          <span class="badge-icon"><svg class="bg-svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.918-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.337 2.25c-.416-.165-.866-.25-1.336-.25-2.21 0-3.918 1.79-3.918 4 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.46.826 2.75 2.043 3.45-.05.223-.08.455-.08.69 0 2.21 1.71 4 3.918 4 .47 0 .92-.086 1.336-.25.52 1.334 1.826 2.25 3.337 2.25 1.51 0 2.818-.916 3.337-2.25.415.163.865.248 1.336.248 2.21 0 3.918-1.79 3.918-4 0-.235-.03-.467-.08-.69 1.215-.7 2.043-1.99 2.043-3.45z"/></svg><svg class="check-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="chip-label">GREEN</span>
+        </label>
+        <label class="badge-chip" data-color="ORANGE">
+          <input type="checkbox" value="ORANGE" class="badge-check" />
+          <span class="badge-icon"><svg class="bg-svg" viewBox="0 0 24 24"><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.918-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.337 2.25c-.416-.165-.866-.25-1.336-.25-2.21 0-3.918 1.79-3.918 4 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.46.826 2.75 2.043 3.45-.05.223-.08.455-.08.69 0 2.21 1.71 4 3.918 4 .47 0 .92-.086 1.336-.25.52 1.334 1.826 2.25 3.337 2.25 1.51 0 2.818-.916 3.337-2.25.415.163.865.248 1.336.248 2.21 0 3.918-1.79 3.918-4 0-.235-.03-.467-.08-.69 1.215-.7 2.043-1.99 2.043-3.45z"/></svg><svg class="check-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="chip-label">ORANGE</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">react state</div>
+
+      <label class="toggle-row">
+        <div class="toggle-left">
+          <span class="toggle-flag">--auto</span>
+          <span class="toggle-label">auto-patch on nav</span>
+        </div>
+        <input class="toggle-input" type="checkbox" id="autoPatchOnNav" />
+        <span class="toggle-switch"></span>
+      </label>
+    </div>
+
+    <div class="section">
+      <div class="section-header">console</div>
+      <div class="console" id="console">
+        <div class="console-line">
+          <span class="console-ts">[init]</span>
+          <span class="console-ok">patch module loaded</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>KAROTTER://PATCHER — USE AT YOUR OWN RISK</footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
